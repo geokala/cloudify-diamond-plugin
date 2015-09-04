@@ -220,8 +220,16 @@ def config_handlers(ctx, handlers, config_path, handlers_path):
     """
     if handlers is None:
         handlers = copy_objects.deepcopy(DEFAULT_HANDLERS)
+
+        cloudify_agent = ctx.bootstrap_context.cloudify_agent
+
+        # TODO: Deal with SSL too
         handlers['cloudify_handler.cloudify.CloudifyHandler']['config'][
             'server'] = get_manager_ip()
+        handlers['cloudify_handler.cloudify.CloudifyHandler']['config'][
+            'user'] = cloudify_agent.broker_user
+        handlers['cloudify_handler.cloudify.CloudifyHandler']['config'][
+            'password'] = cloudify_agent.broker_pass
     elif not handlers:
         raise exceptions.NonRecoverableError('Empty handlers dict')
 
