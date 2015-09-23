@@ -15,6 +15,7 @@
 
 from diamond.handler.rabbitmq_topic import rmqHandler
 from format import jsonify
+import ssl
 try:
     import pika
 except ImportError:
@@ -29,10 +30,33 @@ class CloudifyHandler(rmqHandler):
            to set auto_delete=True)
         """
         credentials = pika.PlainCredentials(self.user, self.password)
+        try:
+            # If we're in an environment with celery we should have a
+            # worker configuration, but we'll check for backwards
+            # compatibility
+            import worker_conf
+            broker_cert_path = worker_conf.broker_cert_path
+        except (ImportError, AttributeError):
+            broker_cert_path = ''
+
+        if broker_cert_path == '':
+            # No SSL for rabbit
+            broker_port = 5672
+            ssl_enabled = False
+            ssl_options = {}
+        else:
+            broker_port = 5671
+            ssl_enabled = True
+            ssl_options = {
+                'ca_certs': broker_cert_path,
+                'cert_reqs': ssl.CERT_REQUIRED,
+            }
         params = pika.ConnectionParameters(credentials=credentials,
                                            host=self.server,
                                            virtual_host=self.vhost,
-                                           port=self.port)
+                                           port=broker_port,
+                                           ssl=ssl_enabled,
+                                           ssl_options=ssl_options)
         self.connection = pika.BlockingConnection(params)
         self.channel = self.connection.channel()
         self.channel.exchange_declare(exchange=self.topic_exchange,
